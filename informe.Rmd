@@ -2,41 +2,47 @@
 title: "Treball_Bio1"
 author: "Victor Casals, Ivan Castillo, Sergi Esturi, Ferran Garcia i Blanca Rodríguez"
 date: "2024-03-21"
-output: pdf_document
+output: 
+  pdf_document:
+  toc: true
+
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, fig.align = 'center')
 ```
 
-```{r PACKAGE}
-usePackage <- function(p) {
-if (!is.element(p, installed.packages()[,1]))
-install.packages(p, dep = TRUE)
-require(p, character.only = TRUE)
-}
-# Paquets
-usePackage("class")
-usePackage("knitr")
-usePackage("kernlab")
-usePackage("caret")
-usePackage("ROCR")
+```{r GLOBAL_OPTIONS, include=FALSE}
+set.seed(123)
+wd <- "/home/ferran/Documents/Universitat/BIO/treballBIO/"
 ```
 
+```{r PACKAGES, warning=FALSE, message=FALSE}
+library(corrplot)
+library(knitr)
+library(ROCR)
+library(class)
+library(kernlab)
+library(caret)
+```
 
-## Objectius de l’estudi
+\newpage
+# Objectius de l’estudi
+
 L’objectiu de l’estudi és implementar diversos algorismes de Machine Learning per predir la localització subcel·lular de proteïnes. A més a més, un cop implementats els algorismes en qüestió, es compararan els seus rendiments per escollir-ne el de major rendiment. És a dir, es buscarà quin és l'algorisme que millor prediu la localització subcel·lular d'una proteina.
 
+# Mètodes utilitzats
 
-## Mètodes utilitzats
 Es desenvoluparan dos algoritmes de Machine Learning: el K-NN (K-Nearest Neighbour) i l’SVM (Support Vector Machine). Utilitzant 3 fold-cross validation s’exploraran el k-NN amb els valors per al nombre de veïns k = 1, 11, 21, 31, i per al SVM s’exploraran les funcions kernel lineal i rbf.
 
 El mètode de 3 fold cross-validation consisteix en entrenar l’algoritme fent servir tres submostres de les dades d’entrenament o training, i finalment evaluar-ho amb la totalitat de les dades. Amb aquest procediment ajudem al model a tenir una bona capacitat de generalització i que funcioni de manera més acurada amb dades noves.
 
-### K-Nearest Neighbour
+## K-Nearest Neighbour
+
 En aquest mètode, l’objectiu és classificar les dades segons la categoria de les k observacions més properes. L'algoritme k-NN suposa que hi ha observacions similars a prop. Observeu a la imatge de dalt que la majoria de les vegades, punts de dades similars estan a prop els uns dels altres. L'algorisme k-NN depèn que aquesta hipòtesi és prou certa perquè l'algorisme sigui útil. K-NN captura la idea de similitud a través del càlcul de la distància entre els punts. Aquesta distància sovint es mesura amb la distància euclidiana, tot i que també hi ha altres mesures de distància com la distància de Manhattan. 
 
-### Support Vector Machine
+## Support Vector Machine
+
 Support Vector Machines (SVM) és un algorisme d'aprenentatge supervisat que s'utilitza per a problemes de classificació i regressió. L'objectiu del SVM és trobar la millor línia o hiperplà que divideixi les dades en classes diferents. 
 
 En altres paraules, l'algorisme busca una frontera de decisió que separi les dades en classes distintes, de manera que les dades de cada classe es trobin a un costat o l'altre de la frontera. Els vectors de suport són els punts que estan més propers a la frontera i ajuden a definir-la. El SVM és útil per a problemes de classificació on les dades no són linealment separables. En aquests casos, l'algorisme pot utilitzar una funció kernel per a transformar les dades en un espai de característiques de dimensió superior, on les dades poden ser separades per una frontera de decisió lineal.
@@ -49,127 +55,146 @@ Això fa que el kernel RBF sigui més adequat per a problemes on les dades no s�
 
 En resum, la principal diferència entre el kernel lineal i el kernel RBF és la naturalesa de la frontera de decisió que generen, sent el kernel lineal més simple però limitat i el kernel RBF més complex però flexible. La elecció del kernel depèn del problema en qüestió i la naturalesa de les dades.
 
-
-Entrada de dades
-```{r ENT_DADES}
-data<- read.table("yeast.data", quote="\"", comment.char="")
-colnames(data)<-c("nom_seq","mcg", "gvh", "alm", "mit", "erl", "pox", "vac", "nuc", "localitzacio")
-
-#Crear un vector amb els valors a considerar
-valors_considerats <- c("CYT", "ME1", "ME2", "ME3", "MIT", "NUC")
-
-#Seleccionar les files amb valors en la columna "MIT" que estàn a la llista de valors a considerar
-data_filtrat <- subset(data, localitzacio %in% valors_considerats)
-
-# Reasignar els valors de “ME1”, “ME2” y “ME3” com “MEM”
-data_filtrat$localitzacio <- ifelse(data_filtrat$localitzacio %in% c("ME1", "ME2", "ME3"), "MEM", data_filtrat$localitzacio)
+\newpage
+```{r IMPORT_DATA}
+data <- read.table(paste0(wd, "DATA/", "yeast.data"), 
+                  quote="\"", comment.char = "")
+colnames(data) <- c("nom_seq", "mcg", "gvh", "alm", "mit", 
+                    "erl", "pox", "vac", "nuc", "location")
 ```
 
 
-Descriptiva de les dades
+```{r FILTER_DATA}
+# Crear un vector amb els valors a considerar
+valors_considerats <- c("CYT", "ME1", "ME2", "ME3", "MIT", "NUC")
+
+# Seleccionar les files amb valors en la columna "MIT" que estàn a la llista de valors a considerar
+data_filtrat <- subset(data, location %in% valors_considerats)
+```
+
+
+```{r MODIFICA_DATA}
+# Reasignar els valors de “ME1”, “ME2” y “ME3” com “MEM”
+data_filtrat[["location"]] <- ifelse(
+  data_filtrat[["location"]] %in% c("ME1", "ME2", "ME3"), 
+  "MEM", data_filtrat[["location"]]
+  ) |> as.factor()
+```
+
+# Descriptiva
+
 ```{r DESCRIPTIVA1}
-pc<-prcomp(data_filtrat[,-c(1,10)], scale=TRUE)
-windows(20,20)
+head(data_filtrat)
+str(data_filtrat)
+summary(data_filtrat)
+```
+
+```{r DESCRIPTIVA2}
+pc <- prcomp(data_filtrat[,-c(1,10)], scale = TRUE)
 plot(pc, col="salmon")
 summary(pc)
+cor(data_filtrat[, -c(1,10)]) |> corrplot()
 ```
 S'observa com no val la pena reduir la dimensionalitat perquè totes les variables expliquen bona part de la variabilitat. L'últim variable no s'ha pogut incloure perquè és de tipus string.
 
-```{r DESCRIPTIVA2}
+```{r DESCRIPTIVA3}
 plot(data_filtrat)
 vars <- names(data_filtrat)[2:9]
-hist_list <- list()
+par(mfrow=c(3, 3))
 for (var in vars) {
-  hist_list[[var]] <- hist(data_filtrat[[var]], col="blue", breaks=20, main=paste("Distribució de", var))
-}
-windows(20,20)
-par(mfrow=c(3, 3))  
-for (i in 1:length(hist_list)) {
-  plot(hist_list[[i]])
+  hist(data_filtrat[[var]], col = "blue", breaks = 20, 
+       main = paste("Distribució de", var), xlab = var)
 }
 ```
 
-```{r DESCRIPTIVA3}
-head(data_filtrat)
-```
-
-
-#  2. Obtenció de les mostres aleatòries "train" i "test":
+# Train i Test
 
 Tal com demana l'enunciat fixem la llavor aleatòria (123) i fixem que el 67% de les dades seran utilitzades com a training i l'altre 33% com a test.
+
 ```{r TRAIN_TEST}
-set.seed(123)
 p <- 2/3
 indexs <- sample(nrow(data_filtrat), p * nrow(data_filtrat))
-xtrain <- data_filtrat[indexs, ]
-dim(xtrain)
-xtest <- data_filtrat[-indexs,]
-dim(xtest)
+data_train <- data_filtrat[indexs, ]
+data_test <- data_filtrat[-indexs,]
 ```
 
 
-# 3. Aplicar cada algorisme per a la classificació: k-Nearest Neighbour i SVM:
+# Algorismes
 
 Utilitzant 3 fold-cross validation amb el paquet caret, explorar al k-NN els valors per al nombre de veïns k = 1, 11,21,31 i per al SVM explorar les funcions kernel lineal i rbf.
 
-KNN:
+## K-Nearest Neighbours (KNN)
+
 S'observen els veïns d'acord amb la distància euclídea
+
 ```{r KNN}
-#Etiqeuetes
-data_filtrat$localitzacio <- as.factor(data_filtrat$localitzacio)
-levels(data_filtrat$localitzacio) <- c("CYT", "MEM", "MIT", "NUC")
-levels(data_filtrat$localitzacio)
+# la variable 1 és el nom de la seq. i la 10 la resposta
+knn_model_1 <- knn(
+  train = data_train[,-c(1,10)], 
+  test = data_test[,-c(1,10)], 
+  cl = data_train[, 10], 
+  k = 3
+  )
 
-Y_factor <- as.factor(data_filtrat$localitzacio)
-ytrain<-Y_factor[indexs]
-ytest<-Y_factor[-indexs]
-
-
-knn_model_1<-knn(xtrain[,-c(1,10)], xtest[,-c(1,10)], cl=ytrain, k =3)
-#la primera i última columna són strings
-confusionMatrix(knn_model_1, as.factor(ytest)) #només un 55% d'accuracy, es pot millorar molt
+confusionMatrix(knn_model_1, data_test[, 10])
 ```
+Només un 59% d'accuracy, es pot millorar molt
 
 Utilitzar les dades de training afegeix molt biaix, per això es fa una 3-fold cross validation:
-```{r KNN_DIF_K}
+```{r KNN_hyperparam}
 control <- trainControl(method = "cv",   # Método de validación cruzada
-                     number = 3,      # Número de pliegues
-                     verboseIter = TRUE)
+                        number = 3,      # Número de pliegues
+                        verboseIter = TRUE)
 
-knn_model_cv <- train(localitzacio ~ .,              # Fórmula de la variable dependiente en función de las variables independientes
-                      data = xtrain,             # Datos de entrenamiento
+knn_model_cv <- train(location ~ .,     # Fórmula de la variable dependiente en función de las variables independientes
+                      data = data_train,             # Datos de entrenamiento
                       method = "knn",                # Algoritmo k-NN
                       trControl = control,              # Control de entrenamiento con validación cruzada
                       tuneGrid = expand.grid(k = c(1, 11, 21, 31)))
+```
+
+```{r KNN_results}
 print(knn_model_cv)
-print(knn_model_cv$results)
-
-#la k òptima és 21
+print(knn_model_cv[["results"]])
+plot(knn_model_cv)
+# la k òptima és 21
 ```
 
+## Support Vector Machine (SVM)
 
-SVM:
-```{r KERNEL_LINEAL}
-#mydata <- data.frame(ytrain,xtrain)
-mydata_lineal<- ksvm(localitzacio ~ ., data = xtrain,
-kernel = "vanilladot")
+```{r SVM_LINEAL_train}
+svm_lineal <- ksvm(location ~ .,
+                   data = data_train[, -1],
+                   kernel = "vanilladot")
 ```
 
-```{r}
-mydata_lineal_predict<- predict(mydata_lineal, xtest)
-
-conf_mat.lineal <- confusionMatrix(mydata_lineal_predict, as.factor(ytest))
+```{r SVM_LINEAL_confusionmatrix}
+svm_lineal_predict <- predict(svm_lineal, data_test)
+conf_mat.lineal <- confusionMatrix(svm_lineal_predict, data_test[, 10])
 conf_mat.lineal
 ```
 
-
-```{r KERNEL_RBF}
-mydata_rbf<- ksvm(localitzacio ~ ., data = train_data,
-kernel = "rbf")
-
-mydata_rbf_predict<- predict(mydata_rbf, test_data)
-(conf_mat.rbf <- confusionMatrix(mydata_rbf_predict,as.factor(ytest)))
+```{r KERNEK_GAUSS_train}
+svm_rbf <- ksvm(location ~ ., 
+                data = data_train[, -1], kernel = "rbf")
 ```
 
+```{r KERNEK_GAUSS_confusionmatrix}
+svm_rbf_predict <- predict(svm_rbf, data_test)
+conf_mat.rbf <- confusionMatrix(svm_rbf_predict, data_test[,10])
+conf_mat.rbf
+```
 
+```{r KERNEK_GAUSS_hyperparam}
+mysigma <- c(.0001, 0.001, 0.005, .01, .05, .1)
+myC <- 1:5
 
+param_space <- expand.grid(sigma = mysigma, C = myC)
+model_sr <- caret::train(location ~ ., 
+                         data = data_train[, -1], 
+                         method='svmRadial',
+                         trControl = trainControl(method = 'cv', number = 3),
+                         tuneGrid = param_space, 
+                         trace = FALSE)
+plot(model_sr)
+```
