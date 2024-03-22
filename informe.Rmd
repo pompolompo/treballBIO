@@ -4,12 +4,14 @@ author: "Victor Casals, Ivan Castillo, Sergi Esturi, Ferran Garcia i Blanca Rodr
 date: "2024-03-21"
 output: 
   pdf_document:
-  toc: true
+    toc: true
 
 ---
+\vspace{1cm}
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, fig.align = 'center')
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.align = 'center')
 ```
 
 ```{r GLOBAL_OPTIONS, include=FALSE}
