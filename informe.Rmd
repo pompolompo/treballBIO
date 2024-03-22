@@ -92,15 +92,28 @@ summary(data_filtrat)
 ```
 
 ```{r DESCRIPTIVA2}
+cor(data_filtrat[, -c(1,10)]) |> corrplot()
 pc <- prcomp(data_filtrat[,-c(1,10)], scale = TRUE)
 plot(pc, col="salmon")
 summary(pc)
-cor(data_filtrat[, -c(1,10)]) |> corrplot()
 ```
 S'observa com no val la pena reduir la dimensionalitat perquè totes les variables expliquen bona part de la variabilitat. L'últim variable no s'ha pogut incloure perquè és de tipus string.
 
-```{r DESCRIPTIVA3}
-plot(data_filtrat)
+```{r DESCRIPTIVA3, fig.height=7}
+levs <- levels(data_filtrat[["location"]])
+num <- table(data_filtrat[["location"]])
+par(mfrow = c(2, 2))
+for(l in 1:length(levs)){
+  boxplot(
+    data_filtrat[data_filtrat[["location"]] == levs[l], -c(1, 10)],
+    main = paste("Localització", levels(data_filtrat[["location"]])[l], 
+                 "amb", num[l], "observacions"), col = "lightblue"
+  )
+}
+rm(list = c("levs", "num"))
+```
+
+```{r DESCRIPTIVA4}
 vars <- names(data_filtrat)[2:9]
 par(mfrow=c(3, 3))
 for (var in vars) {
